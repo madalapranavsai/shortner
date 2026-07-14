@@ -1,6 +1,10 @@
+import asyncio
+import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Create async engine for Postgres (uses asyncpg driver)
 engine = create_async_engine(
@@ -23,15 +27,32 @@ async_session = sessionmaker(
 )
 
 async def init_db():
-    """Initializes tables in PostgreSQL using SQLModel metadata."""
+    """Initializes tables in PostgreSQL using SQLModel metadata with retries."""
     from sqlmodel import SQLModel
     # Ensure models are imported so they register on SQLModel.metadata
     from app.models import URL, APIKey, User
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-        # Handle schema updates for existing tables
-        from sqlalchemy import text
-        await conn.execute(text("ALTER TABLE urls ADD COLUMN IF NOT EXISTS user_id INTEGER;"))
+    
+    max_retries = 5
+    retry_delay = 3
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(SQLModel.metadata.create_all)
+                # Handle schema updates for existing tables
+                from sqlalchemy import text
+                await conn.execute(text("ALTER TABLE urls ADD COLUMN IF NOT EXISTS user_id INTEGER;"))
+            logger.info("Database initialized successfully.")
+            return
+        except Exception as e:
+            if attempt == max_retries:
+                logger.error(f"Failed to initialize database after {max_retries} attempts.")
+                raise e
+            logger.warning(
+                f"Database connection failed (attempt {attempt}/{max_retries}): {e}. "
+                f"Retrying in {retry_delay} seconds..."
+            )
+            await asyncio.sleep(retry_delay)
 
 async def get_db_session():
     """FastAPI Dependency for database sessions."""
