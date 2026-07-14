@@ -45,11 +45,19 @@ async def init_db():
             logger.info("Database initialized successfully.")
             return
         except Exception as e:
+            db_host = "unknown"
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(settings.DATABASE_URL)
+                db_host = parsed.netloc.split("@")[-1] if "@" in parsed.netloc else parsed.netloc
+            except Exception:
+                pass
+                
             if attempt == max_retries:
-                logger.error(f"Failed to initialize database after {max_retries} attempts.")
+                logger.error(f"Failed to initialize database at host '{db_host}' after {max_retries} attempts.")
                 raise e
             logger.warning(
-                f"Database connection failed (attempt {attempt}/{max_retries}): {e}. "
+                f"Database connection failed to host '{db_host}' (attempt {attempt}/{max_retries}): {e}. "
                 f"Retrying in {retry_delay} seconds..."
             )
             await asyncio.sleep(retry_delay)
