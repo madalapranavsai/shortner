@@ -9,7 +9,7 @@ RUN npm run build
 # --- Stage 2: Serve Python Backend ---
 FROM python:3.12-slim
 WORKDIR /app
-
+ENV PYTHONDONTWRITEBYTECODE=1
 # Install system dependencies (needed for compiling C-extensions and general tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \

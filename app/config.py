@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/shortner"
@@ -15,6 +16,14 @@ class Settings(BaseSettings):
     
     # Cache configuration (in seconds)
     CACHE_TTL: int = 3600
+
+    @model_validator(mode="after")
+    def adjust_database_url(self) -> "Settings":
+        if self.DATABASE_URL.startswith("postgresql://"):
+            self.DATABASE_URL = self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif self.DATABASE_URL.startswith("postgres://"):
+            self.DATABASE_URL = self.DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+        return self
 
     class Config:
         env_file = ".env"
